@@ -1,0 +1,35 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {spawn} from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+import http from 'node:http';
+import {parse} from '../lib/bookmarks.js';
+test('HTTP: origem, aprovação, exportação, revisão concorrente e reversão',async()=>{
+ const probe=net.createServer();await new Promise(r=>probe.listen(0,'127.0.0.1',r));const port=probe.address().port;await new Promise(r=>probe.close(r));
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'bookmarks-http-'));fs.mkdirSync(path.join(dir,'input'));fs.writeFileSync(path.join(dir,'input','fixture.html'),'<DL><A HREF="https://example.org">Fixture</A></DL>');
+ const extensionId='a'.repeat(32),child=spawn(process.execPath,['server.js'],{env:{...process.env,PORT:String(port),DATA_DIR:dir,INPUT_DIR:path.join(dir,'input'),BOOKMARK_EXTENSION_ID:extensionId},stdio:['ignore','pipe','pipe']});
+ try{await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Servidor não iniciou')),10000);child.stdout.once('data',()=>{clearTimeout(timer);resolve();});child.once('exit',()=>{clearTimeout(timer);reject(Error('Servidor encerrou'));});});
+ const base='http://127.0.0.1:'+port, state=await(await fetch(base+'/api/state')).json(),id=state.proposals[0].id;
+ const post=(url,body,token=state.token,origin=base)=>fetch(base+url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':token,Origin:origin},body:JSON.stringify(body)});
+ assert.equal((await fetch(base)).status,200);
+ const origin='chrome-extension://'+extensionId,bridgeBody={action:'health',nodes:[{id:'one',title:'Synthetic',url:'http://127.0.0.1:9'}],consent:true};
+ assert.equal((await post('/api/bridge',bridgeBody,state.token,'chrome-extension://'+'b'.repeat(32))).status,403);
+ assert.equal((await post('/api/bridge',bridgeBody,'invalid',origin)).status,403);
+ assert.equal((await post('/api/bridge',{...bridgeBody,consent:false},state.token,origin)).status,400);
+ const bridgeResponse=await post('/api/bridge',bridgeBody,state.token,origin);assert.equal(bridgeResponse.status,200);assert.equal(bridgeResponse.headers.get('access-control-allow-origin'),origin);assert.match((await bridgeResponse.json())[0].error,/bloqueado/);
+ const preflight=await fetch(base+'/api/bridge',{method:'OPTIONS',headers:{Origin:origin}});assert.equal(preflight.status,204);
+ assert.ok((await(await fetch(base+'/pair')).text()).includes(state.token));
+ assert.equal((await post('/api/review',{ids:[id],revision:0,update:{status:'approved'}},'invalid')).status,403);
+ assert.equal((await post('/api/review',{ids:[id],revision:0,update:{status:'approved'}},state.token,'https://evil.example')).status,403);
+ assert.equal((await post('/api/check',{ids:[id],revision:0,consent:false})).status,400);
+ assert.equal((await post('/api/review',{ids:[id],revision:0,update:{title:'Título de teste',path:['Revisão'],status:'approved'}})).status,200);
+ const exported=parse(await(await fetch(base+'/api/export')).text());assert.equal(exported.filter(n=>n.type==='link').length,state.audit.links);assert.ok(exported.some(n=>n.title==='Título de teste'));
+ assert.equal((await post('/api/review',{ids:[id],revision:0,update:{status:'rejected'}})).status,400);
+ assert.equal((await post('/api/undo',{revision:1})).status,200);
+ const reverted=await(await fetch(base+'/api/state')).json();assert.deepEqual(reverted.proposals,state.proposals);
+ const invalidHostStatus=await new Promise((resolve,reject)=>{http.get(base+'/api/state',{headers:{Host:'evil.example'}},res=>{res.resume();resolve(res.statusCode);}).on('error',reject);});assert.equal(invalidHostStatus,403);
+ }finally{child.kill();await new Promise(r=>child.exitCode!==null?r():child.once('exit',r));fs.rmSync(dir,{recursive:true});}
+});
