@@ -1,1 +1,18 @@
-{"name":"ai-bookmark-organizer","version":"0.2.0","private":true,"type":"module","license":"MIT","scripts":{"start":"node server.js","audit":"node audit.js","test":"node --test","check":"node tools/check.js","package":"powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1"},"engines":{"node":">=22"}}
+{
+  "name": "ai-bookmark-organizer",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "start": "node server.js",
+    "audit": "node audit.js",
+    "test": "node --test",
+    "check": "node tools/check.js",
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1",
+    "benchmark": "node tools/benchmark.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
