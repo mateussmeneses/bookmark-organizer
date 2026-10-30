@@ -30,7 +30,7 @@ export async function buildPlan(tree,proposals,profile) {
   return {id:crypto.randomUUID(),profile,base:await digest(comparable(tree)),operations,approved:proposals.filter(p=>p.status==='approved').map(p=>p.id)};
 }
 
-export async function restorePlan(current,backup,profile){
+export async function restorePlan(current,backup,profile,organizerFolders=[]){
   await verifySnapshot(backup);if(backup.profile!==profile)throw Error('Backup belongs to a different browser profile');
   const now=indexTree(current),target=indexTree(backup.tree),operations=[],refs=new Map();
   for(const n of target.nodes){
@@ -46,7 +46,12 @@ export async function restorePlan(current,backup,profile){
       operations.push({kind:'move',id:n.id,parentId,index:n.index});
     }
   }
-  // Snapshots cannot distinguish organizer-created folders from external additions.
+  // Restore never removes unknown user additions. Only folders created by this exact
+  // organizer operation can be considered for cleanup, and only when empty.
+  for(const folder of organizerFolders) {
+    if(folder && typeof folder.id==='string' && typeof folder.title==='string')
+      operations.push({kind:'removeEmpty',id:folder.id,expectedTitle:folder.title});
+  }
   return {id:crypto.randomUUID(),profile,base:await digest(comparable(current)),operations,approved:[],restores:backup.id};
 }
 const fields=n=>({id:n.id,parentId:n.parentId,index:n.index,title:n.title,url:n.url});
@@ -88,7 +93,7 @@ export class Executor {
         }else{
           const current=await this.api.get(op.id).then(a=>a[0]).catch(()=>null);
           if(op.kind==='removeEmpty'){
-            if(current&&(await this.api.getChildren(op.id)).length===0)await this.api.remove(op.id);
+            if(current&&current.url===undefined&&current.title===op.expectedTitle&&(await this.api.getChildren(op.id)).length===0)await this.api.remove(op.id);
           }else{
             if(!current)throw Error('Target removed externally');
             if(!desired(current,op)){
@@ -108,5 +113,7 @@ export class Executor {
       await this.storage.set({['operation:'+j.id]:j});return j;
     }catch(error){j.status='conflict';j.error=error.message;await this.save(j);throw error;}
   }
-  async rollback(){const j=(await this.storage.get('journal')).journal;if(!j)throw Error('No operation to roll back');const backup=(await this.storage.get('backup:'+j.backup))['backup:'+j.backup];const plan=await restorePlan(await this.api.getTree(),backup,this.profile);j.status='rolled-back-requested';await this.save(j);return this.start(plan);}
+  async rollback(){const j=(await this.storage.get('journal')).journal;if(!j)throw Error('No operation to roll back');const backup=(await this.storage.get('backup:'+j.backup))['backup:'+j.backup];const organizerFolders=j.plan.operations.filter(op=>op.kind==='create'&&op.url===undefined).reverse()
+      .map(op=>({id:j.map[op.ref],title:op.title})).filter(f=>f.id);
+    const plan=await restorePlan(await this.api.getTree(),backup,this.profile,organizerFolders);j.status='rolled-back-requested';await this.save(j);return this.start(plan);}
 }

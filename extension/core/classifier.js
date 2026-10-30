@@ -40,7 +40,7 @@ export function analyze(tree,options={}) {
 }
 export function duplicateGroups(links,metadata={}) {
   const exact=new Map(),variants=new Map(),redirects=new Map(),near=new Map();
-  const add=(map,key,id)=>{if(key)map.set(key,[...(map.get(key)||[]),id]);};
+  const add=(map,key,id)=>{if(!key)return;let group=map.get(key);if(!group){group=[];map.set(key,group);}group.push(id);};
   for(const n of links){add(exact,n.url,n.id);try{const u=new URL(n.url);for(const k of [...u.searchParams.keys()])if(/^utm_|^(fbclid|gclid)$/i.test(k))u.searchParams.delete(k);add(variants,u.href,n.id);}catch{}add(redirects,metadata[n.url]?.finalUrl,n.id);const text=metadata[n.url]?.excerpt;if(text&&text.length>200)add(near,normalize(text).slice(0,1500),n.id);}
   return {exact:[...exact.values()].filter(g=>g.length>1),tracking:[...variants.values()].filter(g=>g.length>1),redirects:[...redirects.values()].filter(g=>g.length>1),near:[...near.values()].filter(g=>g.length>1)};
 }

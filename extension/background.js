@@ -88,6 +88,44 @@ async function handle(message){
       const results=await relay('health',{nodes,consent:true});for(const item of results)s.metadata[item.url]=item;
       await storage.set({metadata:s.metadata});await sync();return {ok:true};
     }
+    case 'aiAll': {
+      if(message.consent!==true)throw Error('Model consent required');
+      const links=indexTree(await chrome.bookmarks.getTree()).links,proposalsById=new Map(s.proposals.map(p=>[p.id,p]));
+      const nodes=links.filter(n=>{
+        const p=proposalsById.get(n.id);
+        return p&&!['approved','rejected'].includes(p.status)&&p.confidence<.8;
+      });
+      if(!nodes.length)return {ok:true,processed:0};
+      cancel=false;let processed=0;
+      await storage.set({job:{status:'ai-running',done:0,total:nodes.length}});
+      for(let i=0;i<nodes.length;i+=20){
+        if(cancel){await storage.set({job:{status:'ai-paused',done:processed,total:nodes.length}});return {ok:true,processed,cancelled:true};}
+        const batch=nodes.slice(i,i+20),results=await relay('ai',{
+          nodes:batch,consent:true,
+          metadata:Object.fromEntries(batch.map(n=>[n.url,s.metadata[n.url]])),
+          config:{provider:s.settings.provider,endpoint:s.settings.endpoint,model:s.settings.model,key:message.key,consent:true}
+        });
+        if(!Array.isArray(results)||results.length!==batch.length)throw Error('Incomplete AI batch');
+        const byId=new Map(batch.map(n=>[n.id,n])),seen=new Set();
+        for(const p of results){
+          if(!byId.has(p.id)||seen.has(p.id)||!Array.isArray(p.path))throw Error('Invalid AI batch');
+          seen.add(p.id);
+          const category=canonical(p.path.at(-1));
+          if(!categories.some(c=>c.name===category))continue;
+          const n=byId.get(p.id),live=(await chrome.bookmarks.get(n.id))[0];
+          if(!live||live.url!==n.url||live.title!==n.title)throw Error('Browser changed during AI classification');
+          const old=s.proposals.findIndex(x=>x.id===p.id);if(old<0)continue;
+          const value={...s.proposals[old],...p,category,path:categoryPath(category),status:'pending'};
+          s.proposals[old]=value;
+          s.cache[p.id]={key:cacheKey(n,s.metadata[n.url],s.settings.rules,s.learned),value};
+        }
+        processed+=batch.length;
+        await storage.set({proposals:s.proposals,cache:s.cache,job:{status:'ai-running',done:processed,total:nodes.length}});
+      }
+      await storage.remove('plan');
+      await storage.set({job:{status:'complete',done:processed,total:nodes.length}});
+      return {ok:true,processed};
+    }
     case 'ai': {
       if(message.consent!==true)throw Error('Model consent required');
       const ids=new Set(message.ids),nodes=indexTree(await chrome.bookmarks.getTree()).links.filter(n=>ids.has(n.id));if(nodes.length>20||!nodes.length)throw Error('Select 1–20 bookmarks');
