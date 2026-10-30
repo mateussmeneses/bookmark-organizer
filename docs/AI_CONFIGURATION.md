@@ -1,20 +1,33 @@
-# AI providers, classification, and privacy
+# Semantic-first AI bookmark organization
 
-The extension uses offline deterministic rules by default. Its sparse keyword vectors are **not** neural-network embeddings. Reliable semantic understanding of uncommon subjects requires an optional real model and empirical evaluation.
+The browser extension has two analysis actions:
 
-## Ollama (local)
-1. Install and start Ollama, then download a supported instruction model.
-2. Start the Node.js companion and pair it as described in [installation](INSTALLATION.md).
-3. Select `Ollama`; enter `http://127.0.0.1:11434` and the installed model name.
-4. Check the consent option and use **AI classify selection** or **AI classify all unresolved bookmarks**.
+- **Analyze entire library with AI** — the primary semantic workflow when an AI model has been configured and the user grants consent for this run.
+- **Offline analyze / sync** — fast deterministic processing without a model, used for offline fallback and local indexing.
 
-## OpenAI-compatible HTTP API
-Choose `OpenAI-compatible`, supply the HTTPS API base URL ending with `/v1`, the provider's exact model ID, and an API key. The companion appends `/chat/completions` automatically. Responses must contain JSON classification proposals; some providers do not support `response_format=json_object`.
+The AI workflow **evaluates every eligible pending bookmark**, including items whose keyword classification already looks confident. Approved/rejected proposals, manual corrections and exact-domain user rules are preserved.
 
-## Privacy
-Classification requires consent for the selected operation. Remote AI receives selected URLs, titles and selected metadata. The extension never automatically uploads all bookmarks and never stores an API key. The pairing token is local and expires on companion restart.
+## Setup
 
-The **all unresolved** command processes pending, uncertain bookmarks in groups of 20. It runs only when explicitly requested, caches results for later review, and supports cancellation. It is not an autonomous background inference or silent upload.
+1. Install the extension in a disposable browser profile for initial testing and start the optional Node.js companion with `npm.cmd start`.
+2. Pair the companion using the extension's ID and current localhost session token; see [INSTALLATION.md](INSTALLATION.md).
+3. Under **Automation, models and privacy**, configure **Ollama** (`http://127.0.0.1:11434` and your installed model name) or **OpenAI-compatible** (HTTPS base URL ending in `/v1`, model ID, API key).
+4. Check the per-operation consent box. Click **Analyze entire library with AI** in the top toolbar.
+5. The extension refreshes the entire bookmark tree, sends eligible links to the selected model in batches of up to 20, normalizes the classifications and presents them for review.
+6. Approve proposals, preview the exact move plan and apply it. **AI inference itself never moves, deletes or renames bookmarks.**
 
-## Quality evaluation
-Do not treat heuristic confidence as measured probability. Use a stratified labeled evaluation sample containing at least 50 representative personal bookmarks, including bilingual, niche and ambiguous topics. Record per-category precision, abstention and wrong-folder rates. No quality benchmark on the user's private library has been performed.
+## Caching and continuity
+
+Semantic results are cached by input evidence (URL, title and selected metadata), the selected provider, endpoint and model, and local rules. A subsequent analysis skips unchanged items. Switching models or editing bookmark evidence invalidates the relevant semantic result. Low-confidence or unrecognized topics go to **Review Inbox**, and cached ambiguous decisions are not repeatedly charged until their input or model changes.
+
+The extension records lightweight progress per 20-item batch and checkpoints proposals and results after 100 items, cancellation, completion or error. A retry processes unfinished items. The model is never called silently at browser startup.
+
+## Classification contract
+
+The model receives titles, URLs and selected metadata, not the complete browser profile by default. It must classify topics using meaning rather than simple keywords; Portuguese and English labels map to an English canonical taxonomy. For example, Gaming/Jogos and Piracy/Pirataria are distinct categories. The companion validates model IDs, result completeness and duplicate entries. Unknown categories are sent to Review Inbox instead of creating unreviewed folders. An OpenAI-compatible model that rejects `response_format: json_object` is retried only on a specific compatibility error.
+
+## Privacy and quality
+
+Remote providers receive the metadata you explicitly authorize for that run. Ollama keeps inference local; an external service is governed by that provider's data practices. API keys are not persisted by the extension.
+
+Model-reported confidence is **not calibrated**. Live quality must still be measured against a representative labeled sample, including uncommon bilingual categories, before any automated AI-based modification is considered. The synthetic benchmark measures offline code, not model inference speed.

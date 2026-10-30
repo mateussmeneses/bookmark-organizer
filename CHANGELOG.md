@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.0-beta.10 — Semantic-first classification
+- Full-library AI inference is now the primary, explicitly authorized workflow.
+- Every eligible pending bookmark is semantically classified, regardless of rule confidence.
+- AI results are canonicalized and cached per model and bookmark evidence.
+- Manual approvals remain authoritative; AI suggestions never apply without review.
+- Added semantic regression tests and documentation.
+
+
+
 ## 0.3.0 beta 9
 - Replaced an inline cleanup label with an accessible flex-aligned panel; added a structural regression check.
 

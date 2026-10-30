@@ -70,3 +70,8 @@ No runtime npm dependencies are required. The optional HTML-compatible legacy co
 - [Release validation and limitations](docs/RELEASE.md)
 
 MIT licensed. Contributions are welcome.
+
+
+## AI-first full-library classification
+
+The extension supports a semantic-first workflow with an explicitly selected Ollama or OpenAI-compatible model. Pair the local companion, select the model, grant permission for the run, and click **Analyze entire library with AI**. All unreviewed eligible bookmarks are processed, not just low-confidence keyword suggestions. Results are cached by model and input; previously approved decisions are protected. No bookmark is moved until the user reviews and approves a plan. Without an AI model, use **Offline analyze / sync**. See [AI configuration](docs/AI_CONFIGURATION.md).

@@ -9,7 +9,7 @@ export function semanticSignature(node,metadata={},settings={},learned={}) {
 export function shouldAskModel(node,proposal,settings={},metadata={},learned={}) {
   if(!proposal||['approved','rejected'].includes(proposal.status))return false;
   if(['user','user-rule','learned'].includes(proposal.engine))return false;
-  return proposal.engine!=='ai'||proposal.aiSignature!==semanticSignature(node,metadata,settings,learned);
+  return !['ai','ai-uncertain'].includes(proposal.engine)||proposal.aiSignature!==semanticSignature(node,metadata,settings,learned);
 }
 export function normalizeModelProposal(candidate,node,previous,settings,metadata={},learned={}) {
   if(!candidate||candidate.id!==node.id)throw Error('Unexpected AI bookmark ID');

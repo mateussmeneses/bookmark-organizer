@@ -1,8 +1,14 @@
-# Release v0.3.0 beta 9 — validation report
+# Release v0.3.0 beta 10 — validation report
 
 **Status: pre-release. The code has not been production-validated against personal bookmarks.**
 
 ## Engineering changes
+- Promoted full-library, opt-in semantic model classification to a primary toolbar action; the offline heuristic path remains available.
+- Sends all eligible pending bookmarks for semantic inference rather than only low-confidence keyword matches.
+- Validates and normalizes model categories and preserves manual decisions; model-specific content signatures prevent repeat inference.
+- Saves partial classification results every 100 items, on cancellation, on completion and on errors.
+- Added regression tests covering semantic caching, specialty categories and full-library integration with a mocked model. No live model quality calibration is claimed.
+
 - Corrected the actual cleanup panel HTML element and added static structural verification after a screenshot revealed the old markup was still active.
 - Fixed responsive source-folder cleanup controls after inspecting full-page Chrome/Edge screenshots.
 - Fixed pending-review counts to ignore bookmarks already approved or rejected.
