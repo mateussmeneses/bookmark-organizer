@@ -1,8 +1,9 @@
-# Release v0.3.0 beta 8 — validation report
+# Release v0.3.0 beta 9 — validation report
 
 **Status: pre-release. The code has not been production-validated against personal bookmarks.**
 
 ## Engineering changes
+- Corrected the actual cleanup panel HTML element and added static structural verification after a screenshot revealed the old markup was still active.
 - Fixed responsive source-folder cleanup controls after inspecting full-page Chrome/Edge screenshots.
 - Fixed pending-review counts to ignore bookmarks already approved or rejected.
 - New in beta 7: source-folder cleanup checks the original parent and fields before removing an empty folder.

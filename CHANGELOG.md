@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.0 beta 9
+- Replaced an inline cleanup label with an accessible flex-aligned panel; added a structural regression check.
+
 ## 0.3.0 beta 8
 - Repaired responsive empty-folder cleanup checkbox and integrated it into the review preview.
 - Corrected the pending review metric; added regression coverage.
