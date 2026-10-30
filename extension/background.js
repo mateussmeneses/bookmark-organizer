@@ -2,6 +2,7 @@ import {analyze,indexTree,classifyOne,cacheKey,quality} from './core/classifier.
 import {categories,canonical,categoryPath} from './core/taxonomy.js';
 import {snapshot,verifySnapshot,encryptBackup,decryptBackup} from './core/backup.js';
 import {Executor,buildPlan,restorePlan} from './core/reconcile.js';
+import {shouldAskModel,normalizeModelProposal} from './core/semantic.js';
 
 const storage=chrome.storage.local;
 let queue=Promise.resolve(),executor,cancel=false;
@@ -92,42 +93,58 @@ async function handle(message){
       await storage.set({metadata:s.metadata});await sync();return {ok:true};
     }
     case 'aiAll': {
-      if(message.consent!==true)throw Error('Model consent required');
-      const links=indexTree(await chrome.bookmarks.getTree()).links,proposalsById=new Map(s.proposals.map((p,i)=>[p.id,{proposal:p,index:i}]));
-      const nodes=links.filter(n=>{
-        const p=proposalsById.get(n.id)?.proposal;
-        return p&&!['approved','rejected'].includes(p.status)&&p.confidence<.8;
+      if(message.consent!==true)throw Error('Model consent required for this operation');
+      if(!s.settings.model?.trim())throw Error('Configure a model before starting AI analysis');
+      // Refresh all bookmarks before semantic inference, while respecting past approvals.
+      await sync();
+      const current=await read(),index=indexTree(await chrome.bookmarks.getTree());
+      const slots=new Map(current.proposals.map((p,i)=>[p.id,i]));
+      const nodes=index.links.filter(n=>{
+        const i=slots.get(n.id);
+        return i!==undefined&&shouldAskModel(n,current.proposals[i],current.settings,
+          current.metadata[n.url]||{},current.learned);
       });
-      if(!nodes.length)return {ok:true,processed:0};
-      cancel=false;let processed=0;
-      await storage.set({job:{status:'ai-running',done:0,total:nodes.length}});
-      for(let i=0;i<nodes.length;i+=20){
-        if(cancel){await storage.set({job:{status:'ai-paused',done:processed,total:nodes.length}});return {ok:true,processed,cancelled:true};}
-        const batch=nodes.slice(i,i+20),results=await relay('ai',{
-          nodes:batch,consent:true,
-          metadata:Object.fromEntries(batch.map(n=>[n.url,s.metadata[n.url]])),
-          config:{provider:s.settings.provider,endpoint:s.settings.endpoint,model:s.settings.model,key:message.key,consent:true}
-        });
-        if(!Array.isArray(results)||results.length!==batch.length)throw Error('Incomplete AI batch');
-        const byId=new Map(batch.map(n=>[n.id,n])),seen=new Set(),live=indexTree(await chrome.bookmarks.getTree()).byId;
-        for(const p of results){
-          if(!byId.has(p.id)||seen.has(p.id)||!Array.isArray(p.path))throw Error('Invalid AI batch');
-          seen.add(p.id);
-          const category=canonical(p.path.at(-1));
-          if(!categories.some(c=>c.name===category))continue;
-          const n=byId.get(p.id),current=live.get(n.id);
-          if(!current||current.url!==n.url||current.title!==n.title)throw Error('Browser changed during AI classification');
-          const old=proposalsById.get(p.id)?.index;if(old===undefined)continue;
-          const value={...s.proposals[old],...p,category,path:categoryPath(category),status:'pending'};
-          s.proposals[old]=value;
-          s.cache[p.id]={key:cacheKey(n,s.metadata[n.url],s.settings.rules,s.learned),value};
-        }
-        processed+=batch.length;
-        await storage.set({proposals:s.proposals,cache:s.cache,job:{status:'ai-running',done:processed,total:nodes.length}});
-      }
+      if(!nodes.length)return {ok:true,processed:0,classified:0,uncertain:0,cached:index.links.length};
+      let processed=0,classified=0,uncertain=0;
+      cancel=false;
       await storage.remove('plan');
-      await storage.set({job:{status:'complete',done:processed,total:nodes.length}});
-      return {ok:true,processed};
+      const job=status=>({status,done:processed,total:nodes.length,classified,uncertain});
+      const checkpoint=status=>storage.set({proposals:current.proposals,cache:current.cache,job:job(status)});
+      await storage.set({job:job('ai-running')});
+      try {
+        for(let i=0;i<nodes.length;i+=20){
+          if(cancel){await checkpoint('ai-paused');return {ok:true,processed,cancelled:true};}
+          const batch=nodes.slice(i,i+20);
+          const results=await relay('ai',{nodes:batch,consent:true,
+            metadata:Object.fromEntries(batch.map(n=>[n.url,current.metadata[n.url]])),
+            config:{provider:current.settings.provider,endpoint:current.settings.endpoint,
+              model:current.settings.model,key:message.key,consent:true}});
+          if(!Array.isArray(results)||results.length!==batch.length)throw Error('Incomplete AI batch');
+          const returned=new Map(results.map(p=>[p.id,p]));
+          if(returned.size!==batch.length)throw Error('Duplicate AI results');
+          const live=indexTree(await chrome.bookmarks.getTree()).byId;
+          const updates=[];
+          for(const n of batch){
+            const actual=live.get(n.id),i=slots.get(n.id);
+            if(!actual||actual.title!==n.title||actual.url!==n.url)
+              throw Error('Bookmarks changed during AI analysis; analyze again');
+            if(!returned.has(n.id)||i===undefined)throw Error('Missing model classification');
+            updates.push({slot:i,node:n,value:normalizeModelProposal(
+              returned.get(n.id),n,current.proposals[i],current.settings,
+              current.metadata[n.url]||{},current.learned)});
+          }
+          for(const {slot,node,value} of updates){
+            current.proposals[slot]=value;
+            current.cache[node.id]={key:value.key,value};
+            if(value.category==='Review Inbox')uncertain++;else classified++;
+          }
+          processed+=batch.length;
+          if(processed%100===0||processed===nodes.length)await checkpoint('ai-running');
+          else await storage.set({job:job('ai-running')});
+        }
+        await checkpoint('complete');
+        return {ok:true,processed,classified,uncertain,cached:index.links.length-nodes.length};
+      }catch(error){await checkpoint('ai-error');throw error;}
     }
     case 'ai': {
       if(message.consent!==true)throw Error('Model consent required');
