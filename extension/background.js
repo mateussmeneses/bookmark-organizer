@@ -63,7 +63,7 @@ async function handle(message){
       for(const p of s.proposals)if(ids.has(p.id)){const n=live.get(p.id);p.key=cacheKey(n,s.metadata[n.url],s.settings.rules,s.learned);}
       await storage.remove('plan');await storage.set({proposals:s.proposals,learned:s.learned});return {ok:true};
     }
-    case 'preview': {const tree=await chrome.bookmarks.getTree(),live=indexTree(tree).byId;for(const p of s.proposals.filter(p=>p.status==='approved')){const n=live.get(p.id);if(!n||p.key!==cacheKey(n,s.metadata[n.url],s.settings.rules,s.learned))throw Error('Bookmark or classification changed; analyze and approve again');}const plan=await buildPlan(tree,s.proposals,s.profile);await storage.set({plan});return plan;}
+    case 'preview': {const tree=await chrome.bookmarks.getTree(),live=indexTree(tree).byId;for(const p of s.proposals.filter(p=>p.status==='approved')){const n=live.get(p.id);if(!n||p.key!==cacheKey(n,s.metadata[n.url],s.settings.rules,s.learned))throw Error('Bookmark or classification changed; analyze and approve again');}const plan=await buildPlan(tree,s.proposals,s.profile,{cleanupEmptySourceFolders:message.cleanup===true});await storage.set({plan});return plan;}
     case 'apply': {const {plan}=await storage.get('plan');if(!plan||plan.id!==message.planId)throw Error('Preview the current plan first');const result=await executor.start(plan);await sync();return result;}
     case 'resume': {const result=await executor.resume();await sync();return result;}
     case 'rollback': {const result=await executor.rollback();await sync();return result;}

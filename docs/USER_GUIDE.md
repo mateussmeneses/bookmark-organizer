@@ -24,3 +24,6 @@ Smart Collections save a query without moving any physical bookmark. The progres
 
 ## Scope of restoration
 Undo and restore protect links and original folder placement. Browser-generated IDs and historical timestamps cannot be reproduced arbitrarily. Organizer-created empty folders are cleaned only when proven to belong to the operation and still empty; unknown folders and external additions are retained.
+
+## Optional empty-folder cleanup
+Before Preview, check **Clean up source folders that become empty** if you want to remove obsolete paths. The plan then attempts to remove only existing source folders emptied by approved moves. Any non-empty folder is retained, including folders with unapproved or externally added items. This step has a recoverable backup, but restoring a deleted folder requires a new browser-assigned ID.

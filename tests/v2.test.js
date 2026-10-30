@@ -107,3 +107,25 @@ test('Backup integrity survives browser storage property reordering',async()=>{
  const reordered=reverse(backup);
  assert.deepEqual(await verifySnapshot(reordered),reordered);
 });
+
+test('Opt-in cleanup removes only emptied source folders and restore keeps bookmarks',async()=>{
+ const api=new MockBookmarks(),storage=new MemoryStorage(),original=await api.getTree();
+ const proposals=analyze(original).proposals.filter(p=>p.category!=='Review Inbox').map(p=>({...p,status:'approved'}));
+ const plan=await buildPlan(original,proposals,'profile',{cleanupEmptySourceFolders:true});
+ assert.ok(plan.operations.some(o=>o.kind==='removeEmpty'));
+ const runner=new Executor(api,storage,'profile');
+ const result=await runner.start(plan);
+ assert.equal(result.status,'complete');
+ assert.ok(!indexTree(await api.getTree()).nodes.some(n=>n.title==='Mixed'),'Empty source folder should be cleaned');
+ const rollback=await runner.rollback();
+ assert.equal(rollback.status,'complete');
+ assert.equal(indexTree(await api.getTree()).links.length,indexTree(original).links.length);
+ assert.ok(indexTree(await api.getTree()).nodes.some(n=>n.title==='Mixed'));
+});
+test('Opt-in cleanup preserves a source folder containing unapproved bookmarks',async()=>{
+ const api=new MockBookmarks(),storage=new MemoryStorage(),original=await api.getTree();
+ const proposals=analyze(original).proposals.slice(0,1).map(p=>({...p,status:'approved'}));
+ const plan=await buildPlan(original,proposals,'profile',{cleanupEmptySourceFolders:true});
+ await new Executor(api,storage,'profile').start(plan);
+ assert.ok(indexTree(await api.getTree()).nodes.some(n=>n.title==='Mixed'));
+});

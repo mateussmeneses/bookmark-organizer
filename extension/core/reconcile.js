@@ -2,14 +2,14 @@ import {indexTree} from './classifier.js';
 import {canonical,consolidate} from './taxonomy.js';
 import {digest,comparable,snapshot,verifySnapshot} from './backup.js';
 
-export async function buildPlan(tree,proposals,profile) {
+export async function buildPlan(tree,proposals,profile,options={}) {
   const {byId,nodes}=indexTree(tree),operations=[],folders=new Map();let sequence=0;
   for(const n of nodes)if(n.url===undefined&&n.parentId) {
     const key=n.parentId+'|'+canonical(n.title);
     // Ambiguous sibling folders are retained; the first is a stable destination.
     if(!folders.has(key))folders.set(key,n.id);
   }
-  const seen=new Set();
+  const seen=new Set(),sourceFolders=new Map();
   for(const p of proposals.filter(p=>p.status==='approved')){
     if(seen.has(p.id))throw Error('Duplicate proposal ID');seen.add(p.id);
     const n=byId.get(p.id);if(!n||!n.url||n.unmodifiable)throw Error('Bookmark missing or managed');
@@ -24,8 +24,23 @@ export async function buildPlan(tree,proposals,profile) {
       else if(byId.get(id)&&byId.get(id).title!==title&&!operations.some(o=>o.kind==='update'&&o.id===id))operations.push({kind:'update',id,title});
       parentId=id;
     }
-    if(n.parentId!==parentId)operations.push({kind:'move',id:n.id,parentId});
+    if(n.parentId!==parentId){
+      operations.push({kind:'move',id:n.id,parentId});
+      // Collect only the original ancestor chain; never modify managed roots.
+      let ancestor=byId.get(n.parentId);
+      while(ancestor&&ancestor.parentId&&byId.get(ancestor.parentId)?.parentId!==undefined){
+        if(ancestor.unmodifiable)break;
+        sourceFolders.set(ancestor.id,ancestor);
+        ancestor=byId.get(ancestor.parentId);
+      }
+    }
     if(typeof p.title==='string'&&p.title!==n.title)operations.push({kind:'update',id:n.id,title:p.title});
+  }
+  if(options.cleanupEmptySourceFolders===true){
+    const depthOf=node=>{let depth=0,p=node;while(p?.parentId){depth++;p=byId.get(p.parentId);}return depth;};
+    for(const folder of [...sourceFolders.values()].sort((a,b)=>depthOf(b)-depthOf(a))){
+      operations.push({kind:'removeEmpty',id:folder.id,expectedTitle:folder.title});
+    }
   }
   return {id:crypto.randomUUID(),profile,base:await digest(comparable(tree)),operations,approved:proposals.filter(p=>p.status==='approved').map(p=>p.id)};
 }
