@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 beta 6
+- Verified real Chrome, Edge and Brave smoke workflows in disposable profiles.
+- Reconciled the optional empty-source-folder cleanup checkbox and preview action.
+- Made all three browser smoke suites required CI release gates.
+- Corrected beta-tag automation so new releases match the published commit.
+
 ## 0.3.0 beta 2\n- Fixed a browser-only backup checksum mismatch from storage key reordering; added regression coverage.\n\n## 0.3.0 beta 1
 - Added opt-in, batched classification of unresolved bookmarks using the configured AI companion.
 - Optimized duplicate grouping for large collections.

@@ -21,7 +21,7 @@ node tools/browser-smoke.js "C:\Program Files\Google\Chrome\Application\chrome.e
 
 The runner creates a **fresh temporary profile** with sync disabled, loads the extension, creates synthetic data, applies a plan, rolls it back, checks backup encryption/restore and confirms dashboard rendering. It must never attach to personal browser data.
 
-The CI matrix runs JavaScript checks, tests, synthetic benchmarks and ZIP packaging on Windows with Node 22 and 24. A separate browser-smoke job runs available Chrome/Edge executables and exposes its result. Browser acceptance is non-gating until the test harness and environments are validated; read failures rather than inferring compatibility from unit tests.
+The CI matrix runs JavaScript checks, tests, synthetic benchmarks and ZIP packaging on Windows with Node 22 and 24. Independent browser-smoke jobs test Chrome, Edge and Brave in disposable profiles. Their success is a mandatory CI release gate. Advanced active-sync and service-worker interruption testing remains a separate acceptance requirement.
 
 ## Release procedure
 An automated beta release may be created on `main` after the test matrix succeeds. Releases labeled **beta** are not production validation or browser-store approval. Promote to stable only after Chrome, Edge and Brave acceptance with disposable profile test matrices, recorded versions and evidence.

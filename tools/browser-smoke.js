@@ -98,7 +98,12 @@ try{
   assert.equal(cards,1,'Dashboard failed to render bookmark card after restart');
   fs.mkdirSync('dist',{recursive:true});
   try{
-    const shot=await command('Page.captureScreenshot',{format:'png'},sessionId);
+    const metrics=await command('Page.getLayoutMetrics',{},sessionId);
+    const bounds=metrics.cssContentSize;
+    const shot=await command('Page.captureScreenshot',{
+      format:'png',captureBeyondViewport:true,
+      clip:{x:0,y:0,width:bounds.width,height:bounds.height,scale:1}
+    },sessionId);
     const name=path.basename(executable).replace(/[^a-z0-9]/gi,'-');
     fs.writeFileSync(`dist/smoke-${name}.png`,Buffer.from(shot.data,'base64'));
   }catch(error){console.warn('Screenshot not available:',error.message);}

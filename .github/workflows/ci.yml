@@ -25,11 +25,9 @@ jobs:
           name: packaged-extension
           path: dist/ai-bookmark-organizer-*
 
-  # Real browser tests are kept visible and non-gating during the pre-release.
-  # A green unit-test job is not evidence of Chrome/Edge/Brave compatibility.
+  # All three real-browser smoke suites are mandatory before a release.
   browser-smoke:
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,7 +54,6 @@ jobs:
 
   brave-smoke:
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -95,7 +92,7 @@ jobs:
           if-no-files-found: ignore
 
   release-beta:
-    needs: [test]
+    needs: [test, browser-smoke, brave-smoke]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: windows-latest
     permissions:
@@ -111,10 +108,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = "v0.3.0-beta.2"
+          $tag = "v0.3.0-beta.6"
           gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) {
             Write-Output "Release already exists: $tag"
             exit 0
           }
-          gh release create $tag "dist/ai-bookmark-organizer-0.3.0.zip" "dist/ai-bookmark-organizer-0.3.0.zip.sha256" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "AI Bookmark Organizer v0.3.0 beta 2" --notes-file docs/RELEASE.md --prerelease
+          gh release create $tag "dist/ai-bookmark-organizer-0.3.0.zip" "dist/ai-bookmark-organizer-0.3.0.zip.sha256" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "AI Bookmark Organizer v0.3.0 beta 6" --notes-file docs/RELEASE.md --prerelease

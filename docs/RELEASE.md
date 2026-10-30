@@ -1,9 +1,9 @@
-# Release v0.3.0 beta 2 — validation report
+# Release v0.3.0 beta 6 — validation report
 
 **Status: pre-release. The code has not been production-validated against personal bookmarks.**
 
 ## Engineering changes
-- Added a guided, opt-in AI action to classify all unresolved bookmarks in batches of 20, with explicit consent, progress and cancellation.
+- Restored the optional source-folder cleanup UI controls after reconciling concurrent patches.\n- Added a guided, opt-in AI action to classify all unresolved bookmarks in batches of 20, with explicit consent, progress and cancellation.
 - Improved exact/tracking duplicate grouping to avoid repeated array copies.
 - Extended compensating rollback to remove known organizer-created folders only when still empty and unchanged.
 - Added dedicated regression tests and a synthetic 1K/5K/10K performance benchmark.
@@ -11,14 +11,14 @@
 - Expanded English documentation, release workflow, and walkthroughs.
 
 ## Verification evidence
-- Unit tests and syntax checks: see the specific CI run for this commit.
-- Chrome/Edge browser test: see the separate non-gating browser-smoke job.
-- Brave compatibility: **not verified** until recorded against a disposable Brave profile.
+- Node 22/24 unit tests, syntax checks and 1K/5K/10K synthetic benchmarks: required release gates; see CI for this commit.
+- Chrome/Edge real browser smoke tests: **passed** with Chrome/156.0.8078.48 and Edge/155.0.4283.62 in disposable profiles. Current CI enforces these tests before release.
+- Brave smoke test: **passed** in a fresh temporary profile with the verified official v1.98.62 installer. The CDP product identifies itself as Chrome/156.0.8078.74.
 - Live AI classification quality: **not calibrated** against a real LLM and representative personal bookmarks.
 - Browser sync / interruption recovery: synthetic tests exist; real browser fault-injection remains outstanding.
 - Encryption and snapshots: tested synthetically; application state depends on Chrome extension storage quotas.
 
-The automated GitHub release is intentionally marked **prerelease**. A successful build does not imply readiness for personal bookmark migration.
+The GitHub release requires Node 22/24 tests and real Chrome/Edge/Brave smoke tests to pass; it remains intentionally marked **prerelease**. A successful build does not imply readiness for personal bookmark migration.
 
 ## Manual acceptance checklist
 - [ ] Chrome: install, analyze, approve, preview, apply, rollback, restart and verify
