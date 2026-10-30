@@ -1,8 +1,10 @@
-# Release v0.3.0 beta 7 — validation report
+# Release v0.3.0 beta 8 — validation report
 
 **Status: pre-release. The code has not been production-validated against personal bookmarks.**
 
 ## Engineering changes
+- Fixed responsive source-folder cleanup controls after inspecting full-page Chrome/Edge screenshots.
+- Fixed pending-review counts to ignore bookmarks already approved or rejected.
 - New in beta 7: source-folder cleanup checks the original parent and fields before removing an empty folder.
 - New in beta 7: undo removes only organizer-created folders recorded in completed operations; interrupted/adopted folders are preserved.
 - New in beta 7: classification progress writes are lightweight; full cache and proposal checkpoints happen every 2,000 items plus cancellation/final save.

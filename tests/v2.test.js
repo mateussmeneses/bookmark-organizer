@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {categories,canonical,categoryPath} from '../extension/core/taxonomy.js';
-import {analyze,classifyOne,duplicateGroups,indexTree,embed,cosine} from '../extension/core/classifier.js';
+import {analyze,classifyOne,duplicateGroups,indexTree,embed,cosine,quality} from '../extension/core/classifier.js';
 import {snapshot,verifySnapshot,encryptBackup,decryptBackup,comparable} from '../extension/core/backup.js';
 import {Executor,buildPlan,restorePlan} from '../extension/core/reconcile.js';
 import {fixture,MockBookmarks,MemoryStorage} from './fixtures/browser.js';
@@ -158,4 +158,12 @@ test('Rollback removes only folders positively recorded as organizer-owned',asyn
  assert.equal(after.links.length,indexTree(backup.tree).links.length);
  for(const folder of owned)
    assert.equal(after.byId.has(folder.id),false,'Organizer-owned empty folder must be removed');
+});
+
+test('Review count excludes low-confidence bookmarks already approved or rejected',()=>{
+ const tree=fixture(),items=analyze(tree).proposals;
+ const pending=quality(tree,items).uncertain;
+ assert.ok(pending>0);
+ assert.equal(quality(tree,items.map(p=>({...p,status:'approved'}))).uncertain,0);
+ assert.equal(quality(tree,items.map(p=>({...p,status:'rejected'}))).uncertain,0);
 });

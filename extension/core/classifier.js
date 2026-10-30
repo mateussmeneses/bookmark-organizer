@@ -47,7 +47,7 @@ export function duplicateGroups(links,metadata={}) {
 export function quality(tree,proposals=[]) {
   const {nodes,links,paths}=indexTree(tree),duplicates=duplicateGroups(links),folders=nodes.filter(n=>!n.url&&n.parentId),aliases=new Map();
   for(const n of folders){const key=n.parentId+'|'+canonical(n.title);aliases.set(key,[...(aliases.get(key)||[]),n.id]);}
-  const overlaps=[...aliases.values()].filter(g=>g.length>1),deep=links.filter(n=>(paths.get(n.id)||[]).length>3).length,empty=links.filter(n=>!n.title.trim()).length,uncertain=proposals.filter(p=>p.confidence<.8).length;
+  const overlaps=[...aliases.values()].filter(g=>g.length>1),deep=links.filter(n=>(paths.get(n.id)||[]).length>3).length,empty=links.filter(n=>!n.title.trim()).length,uncertain=proposals.filter(p=>p.confidence<.8&&p.status==='pending').length;
   const penalty=links.length?(empty+deep+duplicates.exact.reduce((sum,g)=>sum+g.length-1,0))/links.length:0;
   return {links:links.length,folders:folders.length,emptyTitles:empty,deep,uncertain,overlaps,duplicates,score:Math.max(0,Math.round(100*(1-penalty))),explanation:'Score penalizes empty titles, exact duplicate excess and paths deeper than three folders. It does not certify semantic correctness.'};
 }

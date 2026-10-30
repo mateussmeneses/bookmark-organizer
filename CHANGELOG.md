@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 beta 8
+- Repaired responsive empty-folder cleanup checkbox and integrated it into the review preview.
+- Corrected the pending review metric; added regression coverage.
+- Preserved upstream beta 7 provenance checks and performance improvements.
+
 ## 0.3.0 beta 7
 - Hardened source-folder cleanup with parent and identity verification.
 - Limited rollback folder deletion to positively recorded organizer creations.
