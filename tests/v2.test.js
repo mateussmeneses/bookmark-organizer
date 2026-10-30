@@ -78,3 +78,20 @@ test('External edit between operations stops a batch before the next mutation',a
  assert.equal(api.calls.filter(([kind])=>kind==='move').length,0);
  assert.equal((await api.get('10'))[0].title,'External edit');
 });
+
+test('Rollback also cleans organizer-owned empty folders',async()=>{
+ const api=new MockBookmarks(),storage=new MemoryStorage(),original=await api.getTree();
+ const proposals=analyze(original).proposals.filter(p=>p.category!=='Review Inbox').map(p=>({...p,status:'approved'}));
+ const runner=new Executor(api,storage,'profile');
+ const applied=await runner.start(await buildPlan(original,proposals,'profile'));
+ assert.equal(applied.status,'complete');
+ const result=await runner.rollback();
+ assert.equal(result.status,'complete');
+ assert.deepEqual(comparable(await api.getTree()),comparable(original));
+});
+test('Duplicate detection handles thousands of repeated URLs',()=>{
+ const links=Array.from({length:10000},(_,i)=>({id:String(i),url:'https://example.org/duplicate?utm_source='+i}));
+ const now=Date.now(),groups=duplicateGroups(links);
+ assert.equal(groups.tracking[0].length,10000);
+ assert.ok(Date.now()-now<10000,'Grouping must not be quadratic');
+});

@@ -90,9 +90,9 @@ async function handle(message){
     }
     case 'aiAll': {
       if(message.consent!==true)throw Error('Model consent required');
-      const links=indexTree(await chrome.bookmarks.getTree()).links,proposalsById=new Map(s.proposals.map(p=>[p.id,p]));
+      const links=indexTree(await chrome.bookmarks.getTree()).links,proposalsById=new Map(s.proposals.map((p,i)=>[p.id,{proposal:p,index:i}]));
       const nodes=links.filter(n=>{
-        const p=proposalsById.get(n.id);
+        const p=proposalsById.get(n.id)?.proposal;
         return p&&!['approved','rejected'].includes(p.status)&&p.confidence<.8;
       });
       if(!nodes.length)return {ok:true,processed:0};
@@ -106,15 +106,15 @@ async function handle(message){
           config:{provider:s.settings.provider,endpoint:s.settings.endpoint,model:s.settings.model,key:message.key,consent:true}
         });
         if(!Array.isArray(results)||results.length!==batch.length)throw Error('Incomplete AI batch');
-        const byId=new Map(batch.map(n=>[n.id,n])),seen=new Set();
+        const byId=new Map(batch.map(n=>[n.id,n])),seen=new Set(),live=indexTree(await chrome.bookmarks.getTree()).byId;
         for(const p of results){
           if(!byId.has(p.id)||seen.has(p.id)||!Array.isArray(p.path))throw Error('Invalid AI batch');
           seen.add(p.id);
           const category=canonical(p.path.at(-1));
           if(!categories.some(c=>c.name===category))continue;
-          const n=byId.get(p.id),live=(await chrome.bookmarks.get(n.id))[0];
-          if(!live||live.url!==n.url||live.title!==n.title)throw Error('Browser changed during AI classification');
-          const old=s.proposals.findIndex(x=>x.id===p.id);if(old<0)continue;
+          const n=byId.get(p.id),current=live.get(n.id);
+          if(!current||current.url!==n.url||current.title!==n.title)throw Error('Browser changed during AI classification');
+          const old=proposalsById.get(p.id)?.index;if(old===undefined)continue;
           const value={...s.proposals[old],...p,category,path:categoryPath(category),status:'pending'};
           s.proposals[old]=value;
           s.cache[p.id]={key:cacheKey(n,s.metadata[n.url],s.settings.rules,s.learned),value};
