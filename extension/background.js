@@ -21,7 +21,10 @@ async function sync(full=false){
       const old=previous.get(node.id);if(old&&old.key===key)p={...p,...old};
       proposals.push({...p,key});done++;
     }
-    await storage.set({cache,proposals,job:{status:'running',done,total:index.links.length,hits}});
+    // Persist lightweight progress frequently; checkpoint the large cache and
+    // proposals every 2,000 items to avoid quadratic JSON serialization.
+    const job={status:'running',done,total:index.links.length,hits};
+    await storage.set(done%2000===0?{cache,proposals,job}:{job});
     await new Promise(r=>setTimeout(r,0));
   }
   const live=new Set(index.links.map(n=>n.id));for(const id of Object.keys(cache))if(!live.has(id))delete cache[id];

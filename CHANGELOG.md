@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 beta 7
+- Hardened source-folder cleanup with parent and identity verification.
+- Limited rollback folder deletion to positively recorded organizer creations.
+- Reduced full-cache writes during analysis; added 2,000-item checkpoints.
+- Added separate duplicate grouping benchmark measurements and regression tests.
+- Maintains mandatory Chrome, Edge and Brave smoke-test release gates.
+
+
 ## 0.3.0 beta 6
 - Verified real Chrome, Edge and Brave smoke workflows in disposable profiles.
 - Reconciled the optional empty-source-folder cleanup checkbox and preview action.

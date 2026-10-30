@@ -129,3 +129,33 @@ test('Opt-in cleanup preserves a source folder containing unapproved bookmarks',
  await new Executor(api,storage,'profile').start(plan);
  assert.ok(indexTree(await api.getTree()).nodes.some(n=>n.title==='Mixed'));
 });
+
+
+test('Source-folder cleanup checks original parent identity before removal',async()=>{
+ const api=new MockBookmarks(),storage=new MemoryStorage(),tree=await api.getTree();
+ const folder=tree[0].children[0].children[0];
+ const {digest,comparable}=await import('../extension/core/backup.js');
+ const plan={id:crypto.randomUUID(),profile:'profile',base:await digest(comparable(tree)),
+   operations:[{kind:'removeEmpty',id:folder.id,expectedTitle:folder.title,expectedParentId:'unexpected-parent'}],approved:[]};
+ const j=await new Executor(api,storage,'profile').start(plan);
+ assert.equal(j.status,'complete');
+ assert.equal((await api.get(folder.id))[0].title,folder.title);
+ assert.equal(api.calls.filter(([kind])=>kind==='remove').length,0);
+});
+
+test('Rollback removes only folders positively recorded as organizer-owned',async()=>{
+ const api=new MockBookmarks(),storage=new MemoryStorage(),tree=await api.getTree();
+ const proposal=analyze(tree).proposals.find(p=>p.category!=='Review Inbox');
+ const plan=await buildPlan(tree,[{...proposal,status:'approved'}],'profile');
+ const runner=new Executor(api,storage,'profile');
+ const result=await runner.start(plan);
+ const owned=result.completed.filter(c=>c.createdFolder).map(c=>c.createdFolder);
+ assert.ok(owned.length>0);
+ const backup=storage.data['backup:'+result.backup];
+ const restored=await runner.rollback();
+ assert.equal(restored.status,'complete');
+ const after=indexTree(await api.getTree());
+ assert.equal(after.links.length,indexTree(backup.tree).links.length);
+ for(const folder of owned)
+   assert.equal(after.byId.has(folder.id),false,'Organizer-owned empty folder must be removed');
+});

@@ -39,7 +39,7 @@ export async function buildPlan(tree,proposals,profile,options={}) {
   if(options.cleanupEmptySourceFolders===true){
     const depthOf=node=>{let depth=0,p=node;while(p?.parentId){depth++;p=byId.get(p.parentId);}return depth;};
     for(const folder of [...sourceFolders.values()].sort((a,b)=>depthOf(b)-depthOf(a))){
-      operations.push({kind:'removeEmpty',id:folder.id,expectedTitle:folder.title});
+      operations.push({kind:'removeEmpty',id:folder.id,expectedTitle:folder.title,expectedParentId:folder.parentId});
     }
   }
   return {id:crypto.randomUUID(),profile,base:await digest(comparable(tree)),operations,approved:proposals.filter(p=>p.status==='approved').map(p=>p.id)};
@@ -64,8 +64,8 @@ export async function restorePlan(current,backup,profile,organizerFolders=[]){
   // Restore never removes unknown user additions. Only folders created by this exact
   // organizer operation can be considered for cleanup, and only when empty.
   for(const folder of organizerFolders) {
-    if(folder && typeof folder.id==='string' && typeof folder.title==='string')
-      operations.push({kind:'removeEmpty',id:folder.id,expectedTitle:folder.title});
+    if(folder && typeof folder.id==='string' && typeof folder.title==='string' && typeof folder.parentId==='string')
+      operations.push({kind:'removeEmpty',id:folder.id,expectedTitle:folder.title,expectedParentId:folder.parentId});
   }
   return {id:crypto.randomUUID(),profile,base:await digest(comparable(current)),operations,approved:[],restores:backup.id};
 }
@@ -98,17 +98,17 @@ export class Executor {
           if(!before&&op.kind!=='removeEmpty')throw Error('Target removed externally');
           j.pending={op,before:op.kind==='create'?before.map(n=>n.id):before?fields(before):null};await this.save(j);
         }
-        const intent=j.pending;let result;
+        const intent=j.pending;let result,createdFolder;
         if(op.kind==='create'){
           const children=await this.api.getChildren(op.parentId),found=children.filter(n=>!intent.before.includes(n.id)&&n.title===op.title&&n.url===op.url);
           if(found.length>1)throw Error('Ambiguous interrupted create; manual conflict resolution required');
           if(found.length===1)result=found[0];
-          else {const args={parentId:op.parentId,title:op.title};if(op.url!==undefined)args.url=op.url;if(op.index!==undefined)args.index=op.index;result=await this.api.create(args);}
+          else {const args={parentId:op.parentId,title:op.title};if(op.url!==undefined)args.url=op.url;if(op.index!==undefined)args.index=op.index;result=await this.api.create(args);if(op.url===undefined)createdFolder={id:result.id,title:op.title,parentId:op.parentId};}
           j.map[op.ref]=result.id;
         }else{
           const current=await this.api.get(op.id).then(a=>a[0]).catch(()=>null);
           if(op.kind==='removeEmpty'){
-            if(current&&current.url===undefined&&current.title===op.expectedTitle&&(await this.api.getChildren(op.id)).length===0)await this.api.remove(op.id);
+            if(current&&current.url===undefined&&current.title===op.expectedTitle&&current.parentId===op.expectedParentId&&same(fields(current),intent.before)&&(await this.api.getChildren(op.id)).length===0)await this.api.remove(op.id);
           }else{
             if(!current)throw Error('Target removed externally');
             if(!desired(current,op)){
@@ -119,7 +119,7 @@ export class Executor {
             const after=(await this.api.get(op.id))[0];if(!desired(after,op))throw Error('Browser did not apply the requested change');
           }
         }
-        j.completed.push({operation:j.cursor,at:new Date().toISOString()});j.cursor++;j.pending=null;j.expected=await digest(comparable(await this.api.getTree()));await this.save(j);
+        j.completed.push({operation:j.cursor,at:new Date().toISOString(),...(createdFolder?{createdFolder}:{})});j.cursor++;j.pending=null;j.expected=await digest(comparable(await this.api.getTree()));await this.save(j);
       }
       const tree=await this.api.getTree(),before=(await this.storage.get('backup:'+j.backup))['backup:'+j.backup];
       const live=indexTree(tree).byId;
@@ -128,7 +128,8 @@ export class Executor {
       await this.storage.set({['operation:'+j.id]:j});return j;
     }catch(error){j.status='conflict';j.error=error.message;await this.save(j);throw error;}
   }
-  async rollback(){const j=(await this.storage.get('journal')).journal;if(!j)throw Error('No operation to roll back');const backup=(await this.storage.get('backup:'+j.backup))['backup:'+j.backup];const organizerFolders=j.plan.operations.filter(op=>op.kind==='create'&&op.url===undefined).reverse()
-      .map(op=>({id:j.map[op.ref],title:op.title})).filter(f=>f.id);
+  async rollback(){const j=(await this.storage.get('journal')).journal;if(!j)throw Error('No operation to roll back');const backup=(await this.storage.get('backup:'+j.backup))['backup:'+j.backup];// Only clean folders whose creation was recorded as ours. An interrupted
+    // create adopted on resume may belong to another actor.
+    const organizerFolders=(j.completed||[]).map(c=>c.createdFolder).filter(Boolean).reverse();
     const plan=await restorePlan(await this.api.getTree(),backup,this.profile,organizerFolders);j.status='rolled-back-requested';await this.save(j);return this.start(plan);}
 }

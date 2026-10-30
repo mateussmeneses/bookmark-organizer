@@ -1,8 +1,12 @@
-# Release v0.3.0 beta 6 — validation report
+# Release v0.3.0 beta 7 — validation report
 
 **Status: pre-release. The code has not been production-validated against personal bookmarks.**
 
 ## Engineering changes
+- New in beta 7: source-folder cleanup checks the original parent and fields before removing an empty folder.
+- New in beta 7: undo removes only organizer-created folders recorded in completed operations; interrupted/adopted folders are preserved.
+- New in beta 7: classification progress writes are lightweight; full cache and proposal checkpoints happen every 2,000 items plus cancellation/final save.
+- New in beta 7: synthetic benchmarks measure duplicate grouping separately, with regression tests for cleanup identity and rollback provenance.
 - Restored the optional source-folder cleanup UI controls after reconciling concurrent patches.\n- Added a guided, opt-in AI action to classify all unresolved bookmarks in batches of 20, with explicit consent, progress and cancellation.
 - Improved exact/tracking duplicate grouping to avoid repeated array copies.
 - Extended compensating rollback to remove known organizer-created folders only when still empty and unchanged.
