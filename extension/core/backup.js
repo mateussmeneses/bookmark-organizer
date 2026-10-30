@@ -1,11 +1,25 @@
-export async function digest(value){const bytes=new TextEncoder().encode(JSON.stringify(value));return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');}
+function stable(value){
+  if(Array.isArray(value))return value.map(stable);
+  if(value!==null&&typeof value==='object'){
+    return Object.fromEntries(Object.keys(value).sort().filter(k=>value[k]!==undefined).map(k=>[k,stable(value[k])]));
+  }
+  return value;
+}
+async function sha256(text){
+  const bytes=new TextEncoder().encode(text);
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');
+}
+// Browser storage may deserialize object keys in a different order. Hash a
+// canonical structure, not JSON's insertion order, to make backups portable.
+export async function digest(value){return sha256(JSON.stringify(stable(value)));}
+async function legacyDigest(value){return sha256(JSON.stringify(value));}
 export function validateTree(tree){
   if(!Array.isArray(tree)||tree.length!==1||tree[0].parentId!==undefined)throw Error('Invalid bookmark root');
   const ids=new Set(),stack=tree.map(n=>[n,undefined]);let count=0;
   while(stack.length){const [n,parent]=stack.pop();if(!n||typeof n.id!=='string'||ids.has(n.id)||typeof n.title!=='string'||n.parentId!==parent||++count>100000)throw Error('Invalid or duplicate bookmark node');ids.add(n.id);if(n.url!==undefined&&typeof n.url!=='string')throw Error('Invalid URL');if(n.url!==undefined&&n.children)throw Error('Bookmark cannot contain children');for(const c of n.children||[])stack.push([c,n.id]);}return tree;
 }
 export async function snapshot(tree,profile,label='Manual backup') {validateTree(tree);const payload={version:2,id:crypto.randomUUID(),at:new Date().toISOString(),profile,label,tree:structuredClone(tree)};return {...payload,checksum:await digest(payload)};}
-export async function verifySnapshot(value){const {checksum,...payload}=value;if(payload.version!==2||await digest(payload)!==checksum)throw Error('Backup integrity validation failed');validateTree(payload.tree);return value;}
+export async function verifySnapshot(value){const {checksum,...payload}=value;if(payload.version!==2||(await digest(payload)!==checksum&&await legacyDigest(payload)!==checksum))throw Error('Backup integrity validation failed');validateTree(payload.tree);return value;}
 const b64=bytes=>btoa(String.fromCharCode(...bytes));
 const un64=text=>Uint8Array.from(atob(text),c=>c.charCodeAt(0));
 async function keyFor(password,salt){const material=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}

@@ -1,4 +1,4 @@
-# Release v0.3.0 beta 1 — validation report
+# Release v0.3.0 beta 2 — validation report
 
 **Status: pre-release. The code has not been production-validated against personal bookmarks.**
 
@@ -7,7 +7,7 @@
 - Improved exact/tracking duplicate grouping to avoid repeated array copies.
 - Extended compensating rollback to remove known organizer-created folders only when still empty and unchanged.
 - Added dedicated regression tests and a synthetic 1K/5K/10K performance benchmark.
-- Reworked the CDP browser smoke runner to use a WebSocket endpoint and real temporary browser profiles, rather than the previous fragile debugging pipe.
+- Fixed a real Chrome rollback integrity failure by hashing canonical JSON before storage serialization (preserves legacy verification when possible).\n- Reworked the CDP browser smoke runner to use a WebSocket endpoint and real temporary browser profiles, rather than the previous fragile debugging pipe.
 - Expanded English documentation, release workflow, and walkthroughs.
 
 ## Verification evidence

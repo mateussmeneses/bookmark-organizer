@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 beta 1
+## 0.3.0 beta 2\n- Fixed a browser-only backup checksum mismatch from storage key reordering; added regression coverage.\n\n## 0.3.0 beta 1
 - Added opt-in, batched classification of unresolved bookmarks using the configured AI companion.
 - Optimized duplicate grouping for large collections.
 - Improved rollback to clean known empty folders created during organization.

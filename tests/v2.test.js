@@ -95,3 +95,15 @@ test('Duplicate detection handles thousands of repeated URLs',()=>{
  assert.equal(groups.tracking[0].length,10000);
  assert.ok(Date.now()-now<10000,'Grouping must not be quadratic');
 });
+
+test('Backup integrity survives browser storage property reordering',async()=>{
+ const backup=await snapshot(fixture(),'profile');
+ const reverse=object=>{
+   if(Array.isArray(object))return object.map(reverse);
+   if(object&&typeof object==='object')
+     return Object.fromEntries(Object.entries(object).reverse().map(([key,value])=>[key,reverse(value)]));
+   return object;
+ };
+ const reordered=reverse(backup);
+ assert.deepEqual(await verifySnapshot(reordered),reordered);
+});
