@@ -110,7 +110,7 @@ test('Backup integrity survives browser storage property reordering',async()=>{
 
 test('Opt-in cleanup removes only emptied source folders and restore keeps bookmarks',async()=>{
  const api=new MockBookmarks(),storage=new MemoryStorage(),original=await api.getTree();
- const proposals=analyze(original).proposals.filter(p=>p.category!=='Review Inbox').map(p=>({...p,status:'approved'}));
+ const proposals=analyze(original).proposals.map(p=>p.category==='Review Inbox'?{...p,category:'Gaming',path:['Entertainment','Gaming'],status:'approved'}:{...p,status:'approved'});
  const plan=await buildPlan(original,proposals,'profile',{cleanupEmptySourceFolders:true});
  assert.ok(plan.operations.some(o=>o.kind==='removeEmpty'));
  const runner=new Executor(api,storage,'profile');
