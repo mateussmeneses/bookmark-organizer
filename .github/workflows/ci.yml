@@ -54,6 +54,45 @@ jobs:
           path: dist/smoke-*.png
           if-no-files-found: ignore
 
+  brave-smoke:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install verified Brave stable and run disposable-profile smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = "https://github.com/brave/brave-browser/releases/download/v1.98.62"
+          $name = "BraveBrowserStandaloneSilentSetup.exe"
+          $installer = Join-Path $env:RUNNER_TEMP $name
+          Invoke-WebRequest "$base/$name" -OutFile $installer
+          $checksum = (Invoke-WebRequest "$base/$name.sha256").Content
+          $expected = [regex]::Match($checksum, '[A-Fa-f0-9]{64}').Value
+          if (-not $expected) { throw "Missing published SHA256 for Brave installer" }
+          $actual = (Get-FileHash -Algorithm SHA256 $installer).Hash
+          if ($actual -ine $expected) { throw "Brave standalone installer checksum mismatch" }
+          $installerProcess = Start-Process -FilePath $installer -Wait -PassThru
+          if ($installerProcess.ExitCode -ne 0) { throw "Brave installer failed with $($installerProcess.ExitCode)" }
+          $paths = @(
+            "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\Application\brave.exe",
+            "$env:ProgramFiles\BraveSoftware\Brave-Browser\Application\brave.exe",
+            "${env:ProgramFiles(x86)}\BraveSoftware\Brave-Browser\Application\brave.exe"
+          )
+          $browser = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $browser) { throw "Brave executable not found after installation" }
+          node tools/browser-smoke.js "$browser"
+          if ($LASTEXITCODE -ne 0) { throw "Brave browser acceptance failed" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: brave-browser-smoke-evidence
+          path: dist/smoke-*.png
+          if-no-files-found: ignore
+
   release-beta:
     needs: [test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -71,10 +110,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = "v0.3.0-beta.3"
+          $tag = "v0.3.0-beta.2"
           gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) {
             Write-Output "Release already exists: $tag"
             exit 0
           }
-          gh release create $tag "dist/ai-bookmark-organizer-0.3.0.zip" "dist/ai-bookmark-organizer-0.3.0.zip.sha256" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "AI Bookmark Organizer v0.3.0 beta 3" --notes-file docs/RELEASE.md --prerelease
+          gh release create $tag "dist/ai-bookmark-organizer-0.3.0.zip" "dist/ai-bookmark-organizer-0.3.0.zip.sha256" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "AI Bookmark Organizer v0.3.0 beta 2" --notes-file docs/RELEASE.md --prerelease

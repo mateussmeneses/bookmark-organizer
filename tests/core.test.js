@@ -18,3 +18,20 @@ test('validação de respostas e destinos',()=>{const p=propose(parse(fixture))[
 test('rede bloqueia loopback, IPv6 e redes privadas para consultas',async()=>{for(const ip of ['127.0.0.1','10.0.0.2','172.16.0.1','192.168.1.1','169.254.169.254','::1','::ffff:127.0.0.1','100.64.0.1'])assert.equal(publicIP(ip),false);assert.equal(publicIP('8.8.8.8'),true);await assert.rejects(request('http://127.0.0.1:9'));await assert.rejects(request('file:///etc/passwd'));});
 test('adaptadores IA usam consentimento, JSON e IDs selecionados',async()=>{const nodes=parse('<DL><A HREF="https://example.com">Exemplo</A></DL>');let seen;const server=http.createServer(async(req,res)=>{let raw='';for await(const c of req)raw+=c;seen={url:req.url,body:JSON.parse(raw)};const content=JSON.stringify({proposals:[{id:nodes[0].id,title:'Exemplo',path:['Pessoal'],reason:'Teste',confidence:.5}]});res.setHeader('Content-Type','application/json');res.end(JSON.stringify(req.url==='/api/chat'?{message:{content}}:{choices:[{message:{content}}]}));});await new Promise(r=>server.listen(0,'127.0.0.1',r));try{const config={endpoint:'http://127.0.0.1:'+server.address().port,model:'mock',provider:'ollama',consent:true};await assert.rejects(classify(nodes,propose(nodes),{},{...config,consent:false}));const result=await classify(nodes,propose(nodes),{},config);assert.equal(result[0].engine,'ai');assert.equal(result[0].status,'pending');assert.equal(seen.url,'/api/chat');await classify(nodes,propose(nodes),{},{...config,provider:'openai',endpoint:config.endpoint+'/v1'});assert.equal(seen.url,'/v1/chat/completions');}finally{server.close();}});
 test('biblioteca real mantém todos os links, metadados e hashes',t=>{if(!fs.existsSync('input')){t.skip('Optional private input is absent');return;}const {nodes,sources}=readInput();assert.deepEqual(parse(exportHTML(nodes),'roundtrip').map(({id,parent,source,...n})=>n),nodes.map(({id,parent,source,...n})=>n));const round=parse(exportHTML(nodes));assert.deepEqual(round.map(n=>pathOf(n,round)),nodes.map(n=>pathOf(n,nodes)));for(const s of sources)assert.equal(hash(fs.readFileSync('input/'+s.name)),s.sha256);assert.equal(audit(nodes).links,audit(round).links);});
+
+test('OpenAI-compatible providers can reject optional response_format',async()=>{
+ const nodes=parse('<DL><A HREF="https://example.com">Gaming</A></DL>');
+ let requests=0;
+ const server=http.createServer(async(req,res)=>{
+   let raw='';for await(const c of req)raw+=c;
+   const request=JSON.parse(raw);requests++;
+   if(request.response_format){res.statusCode=400;res.end('Unsupported parameter: response_format');return;}
+   res.setHeader('Content-Type','application/json');
+   res.end(JSON.stringify({choices:[{message:{content:JSON.stringify({proposals:[{id:nodes[0].id,title:'Gaming',path:['Entertainment','Gaming'],confidence:.8,reason:'Games'}]})}}]}));
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ try{
+   const result=await classify(nodes,[],{}, {provider:'openai',endpoint:'http://127.0.0.1:'+server.address().port+'/v1',model:'mock',consent:true});
+   assert.equal(requests,2);assert.equal(result[0].path.at(-1),'Gaming');
+ }finally{server.close();}
+});

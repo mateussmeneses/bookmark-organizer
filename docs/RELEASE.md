@@ -1,9 +1,9 @@
-# Release v0.3.0 beta 3 — validation report
+# Release v0.3.0 beta 2 — validation report
 
 **Status: pre-release. The code has not been production-validated against personal bookmarks.**
 
 ## Engineering changes
-- Added explicit opt-in cleanup of obsolete empty source folders, preserving non-empty folders and making ID recreation limitations visible.\n- Added a guided, opt-in AI action to classify all unresolved bookmarks in batches of 20, with explicit consent, progress and cancellation.
+- Added a guided, opt-in AI action to classify all unresolved bookmarks in batches of 20, with explicit consent, progress and cancellation.
 - Improved exact/tracking duplicate grouping to avoid repeated array copies.
 - Extended compensating rollback to remove known organizer-created folders only when still empty and unchanged.
 - Added dedicated regression tests and a synthetic 1K/5K/10K performance benchmark.
